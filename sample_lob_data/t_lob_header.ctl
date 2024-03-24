@@ -1,0 +1,14 @@
+LOAD DATA
+INFILE 't_lob_header.dat' "str '\r\n'"
+BADFILE 't_lob_header.bad'
+DISCARDFILE 't_lob_header.dsc'
+TRUNCATE
+INTO TABLE T_LOB_HEADER
+FIELDS TERMINATED BY ','
+OPTIONALLY ENCLOSED BY '"'
+TRAILING NULLCOLS
+(
+id,
+ext_fname FILLER,
+TEXT      LOBFILE(ext_fname) TERMINATED BY EOF
+)
