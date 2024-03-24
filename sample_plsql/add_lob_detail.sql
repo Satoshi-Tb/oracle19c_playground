@@ -148,6 +148,7 @@ IS
         v_ptag_count NUMBER;
         v_count NUMBER;
         v_fragment CLOB;
+        v_fragment_len NUMBER;
     BEGIN
         -- EXECUTE IMMEDIATE 'TRUNCATE TABLE T_LOB_DETAIL';
         TS_LOG('PROC_ADD_2 処理開始');
@@ -169,14 +170,15 @@ IS
 
                 -- 部分文字列取得（Pタグの中身）（NULL文字の可能性あり）
                 v_fragment := REGEXP_SUBSTR(rec.TEXT, '<p>(.*?)</p>', v_cur_pos, 1, 'i', 1);
- 
+                v_fragment_len := NVL(DBMS_LOB.GETLENGTH(v_fragment), 0);
+
                 v_ptag_count := v_ptag_count + 1;
                 INSERT INTO T_LOB_DETAIL (HEADER_ID, NO, FRAGMENT, FRAGMENT_LEN, MEMO)
                 VALUES (
                     rec.ID,
                     v_ptag_count,
-                    v_fragment,
-                    NVL(DBMS_LOB.GETLENGTH(v_fragment), 0),
+                    CASE v_fragment_len WHEN 0 THEN NULL ELSE v_fragment END,
+                    v_fragment_len,
                     'ADD2'
                 );
 
@@ -207,7 +209,7 @@ IS
         v_end_pos NUMBER;
         v_ptag_count NUMBER;
         v_count NUMBER;
-        v_amount NUMBER;
+        v_fragment_len NUMBER;
         v_fragment CLOB;
     BEGIN
         -- EXECUTE IMMEDIATE 'TRUNCATE TABLE T_LOB_DETAIL';
@@ -231,31 +233,36 @@ IS
                 v_end_pos := INSTR(rec.TEXT, '</p>', v_start_pos + 3);
                 EXIT WHEN v_end_pos = 0;
 
-                v_amount := v_end_pos - v_start_pos - 3;
+                v_fragment_len := v_end_pos - v_start_pos - 3;
                 -- DBMS_LOB.SUBSTRの戻り値はvarchar2のため、32K以上の場合、結果がNULLになる
-                -- v_fragment := DBMS_LOB.SUBSTR(rec.TEXT, v_amount, v_start_pos + 3);
-                v_fragment := LOB_SUBSTR(rec.TEXT, v_amount, v_start_pos + 3);
+                -- v_fragment := DBMS_LOB.SUBSTR(rec.TEXT, v_fragment_len, v_start_pos + 3);
+
+                -- 一時CLOBの初期化
+                DBMS_LOB.CREATETEMPORARY(v_fragment, TRUE);
+
+                IF v_fragment_len > 0 THEN
+                    -- CLOBの部分コピー
+                    DBMS_LOB.COPY(v_fragment, rec.TEXT, v_fragment_len, 1, v_start_pos + 3);
+                END IF;
+
                 v_ptag_count := v_ptag_count + 1;
 
                 -- DEBUGログ(SUBSTR失敗ログ)
-                IF v_amount > 0 AND v_fragment IS NULL THEN
-                    TS_LOG('ptag(' || v_ptag_count || ') actual[' || v_amount || '] but fragment is null');
+                IF v_fragment_len > 0 AND v_fragment IS NULL THEN
+                    TS_LOG('ptag(' || v_ptag_count || ') actual[' || v_fragment_len || '] but fragment is null');
                 END IF;
-
 
                 INSERT INTO T_LOB_DETAIL (HEADER_ID, NO, FRAGMENT, FRAGMENT_LEN, MEMO)
                 VALUES (
                     rec.ID,
                     v_ptag_count,
-                    v_fragment,
-                    v_amount,
+                    CASE v_fragment_len WHEN 0 THEN NULL ELSE v_fragment END,
+                    v_fragment_len,
                     'ADD3'
                 );
 
                 -- 解放
-                IF v_fragment IS NOT NULL THEN
-                    DBMS_LOB.FREETEMPORARY(v_fragment);
-                END IF;
+                DBMS_LOB.FREETEMPORARY(v_fragment);
 
                 -- 次の検索位置を更新
                 v_start_pos := v_end_pos + 1;
