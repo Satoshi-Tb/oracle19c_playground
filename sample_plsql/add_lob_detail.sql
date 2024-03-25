@@ -205,6 +205,7 @@ IS
     -- 3.INSTR使用。
     PROCEDURE PROC_ADD_3
     IS
+        v_pos_check NUMBER;
         v_start_pos NUMBER;
         v_end_pos NUMBER;
         v_ptag_count NUMBER;
@@ -225,17 +226,22 @@ IS
             WRAP_INIT;
 
             LOOP
+                -- REG_ISTRよりも若干速い
+                v_pos_check := INSTR(rec.TEXT, '<p>', v_start_pos);
+                IF v_pos_check = 0 THEN
+                    v_pos_check := INSTR(rec.TEXT, '<P>', v_start_pos); --<>
+                END IF;
+                EXIT WHEN v_pos_check = 0; --見つからない場合終了
+                v_start_pos := v_pos_check;
 
-                -- TODO 大文字小文字の判定
-                v_start_pos := INSTR(rec.TEXT, '<p>', v_start_pos);
-                EXIT WHEN v_start_pos = 0;
-
-                v_end_pos := INSTR(rec.TEXT, '</p>', v_start_pos + 3);
-                EXIT WHEN v_end_pos = 0;
+                v_pos_check := INSTR(rec.TEXT, '</p>', v_start_pos + 3);
+                IF v_pos_check = 0 THEN
+                    v_pos_check := INSTR(rec.TEXT, '</P>', v_start_pos + 3);
+                END IF;
+                EXIT WHEN v_end_pos = 0; --見つからない場合終了
+                v_end_pos := v_pos_check;
 
                 v_fragment_len := v_end_pos - v_start_pos - 3;
-                -- DBMS_LOB.SUBSTRの戻り値はvarchar2のため、32K以上の場合、結果がNULLになる
-                -- v_fragment := DBMS_LOB.SUBSTR(rec.TEXT, v_fragment_len, v_start_pos + 3);
 
                 -- 一時CLOBの初期化
                 DBMS_LOB.CREATETEMPORARY(v_fragment, TRUE);
@@ -297,7 +303,7 @@ BEGIN
     EXECUTE IMMEDIATE 'TRUNCATE TABLE T_LOB_DETAIL';
 
     -- PROC_ADD_1;
-    PROC_ADD_2;
+    -- PROC_ADD_2;
     PROC_ADD_3;
 
 END;
