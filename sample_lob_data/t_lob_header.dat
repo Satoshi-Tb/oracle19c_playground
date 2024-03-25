@@ -4,3 +4,6 @@
 4,sample300k.txt
 5,sample500k.txt
 6,sample1M.txt
+7,sample315K_100p.txt
+8,sample333K_500p.txt
+9,sample313K_1000p.txt
