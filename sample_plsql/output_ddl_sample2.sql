@@ -10,13 +10,49 @@ DECLARE
     drop_flg char(1) := '0';
 
     -- TODO テーブル出力順は外部制約の親から
+    CURSOR c_tables IS
+    WITH childs (child_table, parent_table, depth) AS (
+    SELECT
+        pk.table_name AS parent_table,
+        fk.table_name AS child_table,
+        1 AS depth
+    FROM
+        user_constraints fk
+        JOIN user_constraints pk
+        ON fk.r_constraint_name = pk.constraint_name
+        AND fk.constraint_type = 'R'
+    UNION ALL
+    SELECT
+        r.parent_table,
+        fk.table_name,
+        r.depth + 1
+    FROM
+        childs r
+        JOIN user_constraints fk
+        ON r.child_table  = fk.table_name
+        AND fk.constraint_type = 'R'
+        JOIN user_constraints pk
+        ON fk.r_constraint_name = pk.constraint_name
+    WHERE
+        r.depth < 100
+    )
+    SELECT DISTINCT 2 type, table_name, nvl(depth, 0) depth
+    FROM user_tables ut
+    left outer join childs c
+    on ut.table_name = c.parent_table
+    where
+        ut.TABLE_NAME LIKE '%/_LOB/_%' ESCAPE '/'
+        AND ut.TABLE_NAME NOT LIKE 'DR$%' 
+    ORDER BY depth, table_name;
+
+
     CURSOR c_Objects IS
     SELECT o.OBJECT_TYPE, o.OBJECT_NAME
     FROM USER_OBJECTS o
     WHERE
         o.OBJECT_NAME LIKE '%/_LOB/_%' ESCAPE '/'
         AND o.OBJECT_NAME NOT LIKE 'DR$%' 
-        AND o.OBJECT_TYPE IN ('TABLE', 'INDEX', 'VIEW', 'SEQUENCE', 'MATERIALIZED VIEW')
+        AND o.OBJECT_TYPE IN ('INDEX', 'VIEW', 'SEQUENCE', 'MATERIALIZED VIEW')
         AND NOT EXISTS (
             SELECT * FROM USER_CONSTRAINTS c
             WHERE c.CONSTRAINT_NAME = o.OBJECT_NAME
@@ -45,44 +81,45 @@ BEGIN
     DBMS_METADATA.SET_TRANSFORM_PARAM(DBMS_METADATA.SESSION_TRANSFORM, 'SEGMENT_ATTRIBUTES', FALSE);
 
     DBMS_OUTPUT.PUT_LINE('SET TERMOUT ON');
+
     FOR rec IN c_Objects LOOP
-    BEGIN
-        -- DDLを取得して出力
-        object_ddl := DBMS_METADATA.GET_DDL(rec.OBJECT_TYPE, rec.OBJECT_NAME);
+        BEGIN
+            -- DDLを取得して出力
+            object_ddl := DBMS_METADATA.GET_DDL(rec.OBJECT_TYPE, rec.OBJECT_NAME);
 
-        -- 空文字を削除
-        object_ddl := TRIM(object_ddl);
-        -- object_ddl := REGEXP_REPLACE(object_ddl, '\r', '');
-        -- object_ddl := REGEXP_REPLACE(object_ddl, '\n', '');
-        -- object_ddl := REGEXP_REPLACE(object_ddl, '\t', '');
-        object_ddl := REGEXP_REPLACE(object_ddl, '[[:cntrl:]]', '');
-        object_ddl := REGEXP_REPLACE(object_ddl, '"', '');
+            -- 空文字を削除
+            object_ddl := TRIM(object_ddl);
+            -- object_ddl := REGEXP_REPLACE(object_ddl, '\r', '');
+            -- object_ddl := REGEXP_REPLACE(object_ddl, '\n', '');
+            -- object_ddl := REGEXP_REPLACE(object_ddl, '\t', '');
+            object_ddl := REGEXP_REPLACE(object_ddl, '[[:cntrl:]]', '');
+            object_ddl := REGEXP_REPLACE(object_ddl, '"', '');
 
-        IF rec.OBJECT_TYPE = 'SEQUENCE' THEN
-            object_ddl := REGEXP_REPLACE(object_ddl, 'START WITH \d+', 'START WITH 1');
-        END IF;
-
-        DBMS_OUTPUT.PUT_LINE('PROM > ' || rec.OBJECT_NAME);  -- 出力コメント。出力サイズが大きい場合コメントアウト
-
-        IF drop_flg = '1' AND (
-            rec.OBJECT_TYPE = 'TABLE' OR
-            rec.OBJECT_TYPE = 'SEQUENCE' OR
-            rec.OBJECT_TYPE = 'VIEW' OR
-            rec.OBJECT_TYPE = 'MATERIALIZED VIEW'
-        ) THEN
-            DBMS_OUTPUT.PUT_LINE('DROP ' || rec.OBJECT_TYPE || ' ' || rec.OBJECT_NAME);  -- 出力コメント。出力サイズが大きい場合コメントアウト
-            IF rec.OBJECT_TYPE = 'TABLE' THEN
-                DBMS_OUTPUT.PUT_LINE('CASCADE CONSTRAINTS');
+            IF rec.OBJECT_TYPE = 'SEQUENCE' THEN
+                object_ddl := REGEXP_REPLACE(object_ddl, 'START WITH \d+', 'START WITH 1');
             END IF;
-            DBMS_OUTPUT.PUT_LINE('/');
-        END IF;
 
-        DBMS_OUTPUT.PUT_LINE(object_ddl);
-        DBMS_OUTPUT.PUT_LINE('/');
-    EXCEPTION
-        WHEN OTHERS THEN
-        DBMS_OUTPUT.PUT_LINE('Error retrieving DDL for ' || rec.object_name || ': ' || SQLERRM);
-    END;
+            DBMS_OUTPUT.PUT_LINE('PROM > ' || rec.OBJECT_NAME);  -- 出力コメント。出力サイズが大きい場合コメントアウト
+
+            IF drop_flg = '1' AND (
+                rec.OBJECT_TYPE = 'TABLE' OR
+                rec.OBJECT_TYPE = 'SEQUENCE' OR
+                rec.OBJECT_TYPE = 'VIEW' OR
+                rec.OBJECT_TYPE = 'MATERIALIZED VIEW'
+            ) THEN
+                DBMS_OUTPUT.PUT_LINE('DROP ' || rec.OBJECT_TYPE || ' ' || rec.OBJECT_NAME);  -- 出力コメント。出力サイズが大きい場合コメントアウト
+                IF rec.OBJECT_TYPE = 'TABLE' THEN
+                    DBMS_OUTPUT.PUT_LINE('CASCADE CONSTRAINTS');
+                END IF;
+                DBMS_OUTPUT.PUT_LINE('/');
+            END IF;
+
+            DBMS_OUTPUT.PUT_LINE(object_ddl);
+            DBMS_OUTPUT.PUT_LINE('/');
+        EXCEPTION
+            WHEN OTHERS THEN
+            DBMS_OUTPUT.PUT_LINE('Error retrieving DDL for ' || rec.object_name || ': ' || SQLERRM);
+        END;
     END LOOP;
 
 END;
