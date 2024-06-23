@@ -14,7 +14,7 @@ BEGIN
 END;
 /
 
-spool output_ddl.log
+spool output_dd_sample.log
 
 SELECT REGEXP_REPLACE(
     DBMS_METADATA.GET_DDL('SEQUENCE', 'SEQ_T_LOB_DETAIL', 'PDBUSER'), 
