@@ -9,9 +9,9 @@ DECLARE
     -- DROP文作成
     drop_flg char(1) := '0';
 
-    -- TODO テーブル出力順は外部制約の親から
-    CURSOR c_tables IS
-    WITH childs (child_table, parent_table, depth) AS (
+    -- テーブル出力順は外部制約の親から
+    CURSOR c_objects IS
+    WITH CHILDS (child_table, parent_table, depth) AS (
     SELECT
         pk.table_name AS parent_table,
         fk.table_name AS child_table,
@@ -27,7 +27,7 @@ DECLARE
         fk.table_name,
         r.depth + 1
     FROM
-        childs r
+        CHILDS r
         JOIN user_constraints fk
         ON r.child_table  = fk.table_name
         AND fk.constraint_type = 'R'
@@ -36,28 +36,7 @@ DECLARE
     WHERE
         r.depth < 100
     )
-    SELECT DISTINCT 2 type, table_name, nvl(depth, 0) depth
-    FROM user_tables ut
-    left outer join childs c
-    on ut.table_name = c.parent_table
-    where
-        ut.TABLE_NAME LIKE '%/_LOB/_%' ESCAPE '/'
-        AND ut.TABLE_NAME NOT LIKE 'DR$%' 
-    ORDER BY depth, table_name;
-
-
-    CURSOR c_Objects IS
-    SELECT o.OBJECT_TYPE, o.OBJECT_NAME
-    FROM USER_OBJECTS o
-    WHERE
-        o.OBJECT_NAME LIKE '%/_LOB/_%' ESCAPE '/'
-        AND o.OBJECT_NAME NOT LIKE 'DR$%' 
-        AND o.OBJECT_TYPE IN ('INDEX', 'VIEW', 'SEQUENCE', 'MATERIALIZED VIEW')
-        AND NOT EXISTS (
-            SELECT * FROM USER_CONSTRAINTS c
-            WHERE c.CONSTRAINT_NAME = o.OBJECT_NAME
-        )
-    ORDER BY
+    SELECT DISTINCT
         CASE o.OBJECT_TYPE
             WHEN 'TABLE' THEN 2
             WHEN 'INDEX' THEN 3
@@ -65,8 +44,22 @@ DECLARE
             WHEN 'SEQUENCE' THEN 1
             WHEN 'MATERIALIZED VIEW' THEN 5
             ELSE 99
-        END
-        , o.OBJECT_NAME;
+        END PRI,
+        OBJECT_NAME,
+        OBJECT_TYPE,
+        NVL(DEPTH, 0) DEPTH
+    FROM USER_OBJECTS o
+    LEFT OUTER JOIN CHILDS c
+        ON o.OBJECT_NAME = c.PARENT_TABLE
+    WHERE
+        o.OBJECT_NAME LIKE '%/_LOB/_%' ESCAPE '/'
+        AND o.OBJECT_NAME NOT LIKE 'DR$%' 
+        AND o.OBJECT_TYPE IN ('TABLE', 'INDEX', 'VIEW', 'SEQUENCE', 'MATERIALIZED VIEW')
+        AND NOT EXISTS (
+            SELECT * FROM USER_CONSTRAINTS c
+            WHERE c.CONSTRAINT_NAME = o.OBJECT_NAME
+        )
+    ORDER BY PRI, DEPTH, OBJECT_NAME;
 
 BEGIN
     -- バッファサイズを無制限に設定(クライアント環境によるので注意)
@@ -82,7 +75,7 @@ BEGIN
 
     DBMS_OUTPUT.PUT_LINE('SET TERMOUT ON');
 
-    FOR rec IN c_Objects LOOP
+    FOR rec IN c_objects LOOP
         BEGIN
             -- DDLを取得して出力
             object_ddl := DBMS_METADATA.GET_DDL(rec.OBJECT_TYPE, rec.OBJECT_NAME);
