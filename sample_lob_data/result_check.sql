@@ -1,5 +1,7 @@
+--
+select DBMS_LOB.GETLENGTH(TEXT) text_len from T_LOB_HEADER
+/
 -- 検証用SQL
-
 select memo, HEADER_ID, count(*) from T_LOB_DETAIL
 group by memo, HEADER_ID
 order by 1, 2
@@ -32,3 +34,6 @@ where FRAGMENT is null
 group by memo, HEADER_ID
 order by 1, 2
 /
+-- OracleText最新化
+-- EXEC CTX_DDL.SYNC_INDEX('CTX1_T_LOB_HEADER');
+-- EXEC CTX_DDL.SYNC_INDEX('CTX1_T_LOB_DETAIL');
