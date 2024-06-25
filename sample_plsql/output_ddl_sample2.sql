@@ -70,6 +70,14 @@ DECLARE
     FROM user_col_comments
     WHERE table_name = 'TABLE_NAME' AND comments IS NOT NULL;
 
+    -- シーケンス
+    cursor c_seqences
+    IS
+    SELECT sequence_name name
+    FROM user_sequences
+    WHERE sequence_name NOT LIKE 'ISEQ%'
+    ORDER BY name;    
+
     -- テーブル出力順は外部制約の親から
     CURSOR c_objects IS
     WITH CHILDS (child_table, parent_table, depth) AS (
@@ -121,7 +129,6 @@ DECLARE
             WHERE c.CONSTRAINT_NAME = o.OBJECT_NAME
         )
     ORDER BY PRI, DEPTH, OBJECT_NAME;
-
 BEGIN
     -- バッファサイズを無制限に設定(クライアント環境によるので注意)
     -- NULLにするとおそらく出力されなくなる
@@ -135,6 +142,17 @@ BEGIN
     DBMS_METADATA.SET_TRANSFORM_PARAM(DBMS_METADATA.SESSION_TRANSFORM, 'SEGMENT_ATTRIBUTES', FALSE);
 
     DBMS_OUTPUT.PUT_LINE('SET TERMOUT ON');
+
+    FOR rec IN c_seqences LOOP
+        object_ddl := DBMS_METADATA.GET_DDL('SEQUENCE', rec.name);
+        -- 空文字を削除
+        object_ddl := TRIM(object_ddl);
+        object_ddl := REGEXP_REPLACE(object_ddl, '[[:cntrl:]]', '');
+        object_ddl := REGEXP_REPLACE(object_ddl, '"', '');
+
+        DBMS_OUTPUT.PUT_LINE(object_ddl);
+        DBMS_OUTPUT.PUT_LINE('/');
+    END LOOP;
 
 
     FOR rec IN c_tables LOOP
@@ -166,45 +184,42 @@ BEGIN
         END LOOP;
     END LOOP;
 
-    FOR rec IN c_objects LOOP
-        BEGIN
-            -- DDLを取得して出力
-            object_ddl := DBMS_METADATA.GET_DDL(rec.OBJECT_TYPE, rec.OBJECT_NAME);
+    -- FOR rec IN c_objects LOOP
+    --     BEGIN
+    --         -- DDLを取得して出力
+    --         object_ddl := DBMS_METADATA.GET_DDL(rec.OBJECT_TYPE, rec.OBJECT_NAME);
 
-            -- 空文字を削除
-            object_ddl := TRIM(object_ddl);
-            -- object_ddl := REGEXP_REPLACE(object_ddl, '\r', '');
-            -- object_ddl := REGEXP_REPLACE(object_ddl, '\n', '');
-            -- object_ddl := REGEXP_REPLACE(object_ddl, '\t', '');
-            object_ddl := REGEXP_REPLACE(object_ddl, '[[:cntrl:]]', '');
-            object_ddl := REGEXP_REPLACE(object_ddl, '"', '');
+    --         -- 空文字を削除
+    --         object_ddl := TRIM(object_ddl);
+    --         object_ddl := REGEXP_REPLACE(object_ddl, '[[:cntrl:]]', '');
+    --         object_ddl := REGEXP_REPLACE(object_ddl, '"', '');
 
-            IF rec.OBJECT_TYPE = 'SEQUENCE' THEN
-                object_ddl := REGEXP_REPLACE(object_ddl, 'START WITH \d+', 'START WITH 1');
-            END IF;
+    --         IF rec.OBJECT_TYPE = 'SEQUENCE' THEN
+    --             object_ddl := REGEXP_REPLACE(object_ddl, 'START WITH \d+', 'START WITH 1');
+    --         END IF;
 
-            DBMS_OUTPUT.PUT_LINE('PROM > ' || rec.OBJECT_NAME);  -- 出力コメント。出力サイズが大きい場合コメントアウト
+    --         DBMS_OUTPUT.PUT_LINE('PROM > ' || rec.OBJECT_NAME);  -- 出力コメント。出力サイズが大きい場合コメントアウト
 
-            IF drop_flg = '1' AND (
-                rec.OBJECT_TYPE = 'TABLE' OR
-                rec.OBJECT_TYPE = 'SEQUENCE' OR
-                rec.OBJECT_TYPE = 'VIEW' OR
-                rec.OBJECT_TYPE = 'MATERIALIZED VIEW'
-            ) THEN
-                DBMS_OUTPUT.PUT_LINE('DROP ' || rec.OBJECT_TYPE || ' ' || rec.OBJECT_NAME);  -- 出力コメント。出力サイズが大きい場合コメントアウト
-                IF rec.OBJECT_TYPE = 'TABLE' THEN
-                    DBMS_OUTPUT.PUT_LINE('CASCADE CONSTRAINTS');
-                END IF;
-                DBMS_OUTPUT.PUT_LINE('/');
-            END IF;
+    --         IF drop_flg = '1' AND (
+    --             rec.OBJECT_TYPE = 'TABLE' OR
+    --             rec.OBJECT_TYPE = 'SEQUENCE' OR
+    --             rec.OBJECT_TYPE = 'VIEW' OR
+    --             rec.OBJECT_TYPE = 'MATERIALIZED VIEW'
+    --         ) THEN
+    --             DBMS_OUTPUT.PUT_LINE('DROP ' || rec.OBJECT_TYPE || ' ' || rec.OBJECT_NAME);  -- 出力コメント。出力サイズが大きい場合コメントアウト
+    --             IF rec.OBJECT_TYPE = 'TABLE' THEN
+    --                 DBMS_OUTPUT.PUT_LINE('CASCADE CONSTRAINTS');
+    --             END IF;
+    --             DBMS_OUTPUT.PUT_LINE('/');
+    --         END IF;
 
-            DBMS_OUTPUT.PUT_LINE(object_ddl);
-            DBMS_OUTPUT.PUT_LINE('/');
-        EXCEPTION
-            WHEN OTHERS THEN
-            DBMS_OUTPUT.PUT_LINE('Error retrieving DDL for ' || rec.object_name || ': ' || SQLERRM);
-        END;
-    END LOOP;
+    --         DBMS_OUTPUT.PUT_LINE(object_ddl);
+    --         DBMS_OUTPUT.PUT_LINE('/');
+    --     EXCEPTION
+    --         WHEN OTHERS THEN
+    --         DBMS_OUTPUT.PUT_LINE('Error retrieving DDL for ' || rec.object_name || ': ' || SQLERRM);
+    --     END;
+    -- END LOOP;
 
 END;
 /
