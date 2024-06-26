@@ -85,6 +85,26 @@ DECLARE
     WHERE sequence_name NOT LIKE 'ISEQ%'
     ORDER BY name;    
 
+    -- 空白文字除去
+    FUNCTION TRIM_LOB(input_clob CLOB) RETURN CLOB IS
+        cleaned_clob CLOB;
+    BEGIN
+        -- 空のCLOBを初期化
+        DBMS_LOB.CREATETEMPORARY(cleaned_clob, TRUE);
+
+        -- トリム処理と正規表現による制御文字とダブルクォートの削除
+        cleaned_clob := TRIM(input_clob);
+        cleaned_clob := REGEXP_REPLACE(cleaned_clob, '[[:cntrl:]]', '');
+        cleaned_clob := REGEXP_REPLACE(cleaned_clob, '"', '');
+
+        RETURN cleaned_clob;
+    EXCEPTION
+        WHEN OTHERS THEN
+            -- 何らかのエラーが発生した場合、CLOBを解放してエラーを再度発生させる
+            DBMS_LOB.FREETEMPORARY(cleaned_clob);
+            RAISE;
+    END;
+
     --
     PROCEDURE PROM(prompt IN VARCHAR2)
     IS
@@ -133,12 +153,7 @@ BEGIN
     END IF;
 
     FOR rec IN c_seqences LOOP
-        object_ddl := DBMS_METADATA.GET_DDL('SEQUENCE', rec.name);
-        -- 空文字を削除
-        object_ddl := TRIM(object_ddl);
-        object_ddl := REGEXP_REPLACE(object_ddl, '[[:cntrl:]]', '');
-        object_ddl := REGEXP_REPLACE(object_ddl, '"', '');
-
+        object_ddl := TRIM_LOB(DBMS_METADATA.GET_DDL('SEQUENCE', rec.name));
         -- 開始番号を1にセット
         object_ddl := REGEXP_REPLACE(object_ddl, 'START WITH \d+', 'START WITH 1');
 
@@ -152,11 +167,7 @@ BEGIN
     WHILE i IS NOT NULL LOOP
         table_name := arr_table_names(i);
 
-        object_ddl := DBMS_METADATA.GET_DDL('TABLE', table_name);
-        -- 空文字を削除
-        object_ddl := TRIM(object_ddl);
-        object_ddl := REGEXP_REPLACE(object_ddl, '[[:cntrl:]]', '');
-        object_ddl := REGEXP_REPLACE(object_ddl, '"', '');
+        object_ddl := TRIM_LOB(DBMS_METADATA.GET_DDL('TABLE', table_name));
 
         PROM('> CREATE TABLE ' || table_name);
         DBMS_OUTPUT.PUT_LINE(object_ddl);
@@ -164,12 +175,7 @@ BEGIN
 
         -- インデックス定義
         FOR rec_idx IN c_indexes(table_name) LOOP
-            object_ddl := DBMS_METADATA.GET_DDL('INDEX', rec_idx.index_name);
-            -- 空文字を削除
-            object_ddl := TRIM(object_ddl);
-            object_ddl := REGEXP_REPLACE(object_ddl, '[[:cntrl:]]', '');
-            object_ddl := REGEXP_REPLACE(object_ddl, '"', '');
-
+            object_ddl := TRIM_LOB(DBMS_METADATA.GET_DDL('INDEX', rec_idx.index_name));
             DBMS_OUTPUT.PUT_LINE(object_ddl);
             DBMS_OUTPUT.PUT_LINE('/');
         END LOOP;
