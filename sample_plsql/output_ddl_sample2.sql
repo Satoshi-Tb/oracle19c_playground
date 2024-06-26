@@ -8,12 +8,14 @@ DECLARE
 
     -- DROP文作成
     drop_flg char(1) := '1';
+    out_prom char(1) := '1';
 
     TYPE ARR_VARCHAR2 IS TABLE OF VARCHAR2(255) INDEX BY PLS_INTEGER;
     arr_table_names ARR_VARCHAR2;
     table_name VARCHAR2(255);
     i PLS_INTEGER;
 
+    -- テーブル名取得（親子関係の上から順に取得）
     CURSOR c_tables IS
     WITH refs (child, parent, depth) AS (
     SELECT
@@ -73,7 +75,7 @@ DECLARE
     UNION ALL
     SELECT 'COMMENT ON COLUMN ' || table_name || '.' || column_name || ' IS ''' || REPLACE(comments, '''', '''''') || ''';'
     FROM user_col_comments
-    WHERE table_name = 'TABLE_NAME' AND comments IS NOT NULL;
+    WHERE table_name = p_table_name AND comments IS NOT NULL;
 
     -- シーケンス
     cursor c_seqences
@@ -82,6 +84,15 @@ DECLARE
     FROM user_sequences
     WHERE sequence_name NOT LIKE 'ISEQ%'
     ORDER BY name;    
+
+    --
+    PROCEDURE PROM(prompt IN VARCHAR2)
+    IS
+    BEGIN
+        IF out_prom = '1' THEN
+            DBMS_OUTPUT.PUT_LINE('PROM ' || prompt);
+        END IF;
+    END;
 
 BEGIN
     -- バッファサイズを無制限に設定(クライアント環境によるので注意)
@@ -105,13 +116,17 @@ BEGIN
     -- DROP文
     IF drop_flg = '1' THEN
         FOR rec IN c_seqences LOOP
+            PROM('> DROP SEQUENCE ' || rec.name);
             DBMS_OUTPUT.PUT_LINE('DROP SEQUENCE ' || rec.name);
             DBMS_OUTPUT.PUT_LINE('/');
         END LOOP;
 
         i := arr_table_names.LAST;
         WHILE i IS NOT NULL LOOP
-            DBMS_OUTPUT.PUT_LINE('DROP TABLE ' || arr_table_names(i) || ' CASCADE CONSTRAINTS');
+            table_name := arr_table_names(i);
+
+            PROM('> DROP TABLE ' || table_name);
+            DBMS_OUTPUT.PUT_LINE('DROP TABLE ' || table_name || ' CASCADE CONSTRAINTS');
             DBMS_OUTPUT.PUT_LINE('/');
             i := arr_table_names.PRIOR(i);
         END LOOP;
@@ -127,6 +142,7 @@ BEGIN
         -- 開始番号を1にセット
         object_ddl := REGEXP_REPLACE(object_ddl, 'START WITH \d+', 'START WITH 1');
 
+        PROM('> CREATE SEQUENCE ' || rec.name);
         DBMS_OUTPUT.PUT_LINE(object_ddl);
         DBMS_OUTPUT.PUT_LINE('/');
     END LOOP;
@@ -142,6 +158,7 @@ BEGIN
         object_ddl := REGEXP_REPLACE(object_ddl, '[[:cntrl:]]', '');
         object_ddl := REGEXP_REPLACE(object_ddl, '"', '');
 
+        PROM('> CREATE TABLE ' || table_name);
         DBMS_OUTPUT.PUT_LINE(object_ddl);
         DBMS_OUTPUT.PUT_LINE('/');
 
