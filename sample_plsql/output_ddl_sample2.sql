@@ -9,6 +9,11 @@ DECLARE
     -- DROP文作成
     drop_flg char(1) := '1';
 
+    TYPE ARR_VARCHAR2 IS TABLE OF VARCHAR2(255) INDEX BY PLS_INTEGER;
+    arr_table_names ARR_VARCHAR2;
+    table_name VARCHAR2(255);
+    i PLS_INTEGER;
+
     CURSOR c_tables IS
     WITH refs (child, parent, depth) AS (
     SELECT
@@ -92,6 +97,11 @@ BEGIN
 
     DBMS_OUTPUT.PUT_LINE('SET TERMOUT ON');
 
+    -- 対象テーブルを格納
+    FOR rec IN c_tables LOOP
+        arr_table_names(arr_table_names.COUNT) := rec.table_name;
+    END LOOP;
+
     -- DROP文
     IF drop_flg = '1' THEN
         FOR rec IN c_seqences LOOP
@@ -99,10 +109,11 @@ BEGIN
             DBMS_OUTPUT.PUT_LINE('/');
         END LOOP;
 
-        -- TODOテーブルは逆順で
-        FOR rec IN c_tables LOOP
-            DBMS_OUTPUT.PUT_LINE('DROP TABLE ' || rec.table_name || 'CASCADE CONSTRAINTS');
+        i := arr_table_names.LAST;
+        WHILE i IS NOT NULL LOOP
+            DBMS_OUTPUT.PUT_LINE('DROP TABLE ' || arr_table_names(i) || ' CASCADE CONSTRAINTS');
             DBMS_OUTPUT.PUT_LINE('/');
+            i := arr_table_names.PRIOR(i);
         END LOOP;
     END IF;
 
@@ -118,8 +129,11 @@ BEGIN
     END LOOP;
 
 
-    FOR rec IN c_tables LOOP
-        object_ddl := DBMS_METADATA.GET_DDL('TABLE', rec.table_name);
+    i := arr_table_names.FIRST;
+    WHILE i IS NOT NULL LOOP
+        table_name := arr_table_names(i);
+
+        object_ddl := DBMS_METADATA.GET_DDL('TABLE', table_name);
         -- 空文字を削除
         object_ddl := TRIM(object_ddl);
         object_ddl := REGEXP_REPLACE(object_ddl, '[[:cntrl:]]', '');
@@ -129,7 +143,7 @@ BEGIN
         DBMS_OUTPUT.PUT_LINE('/');
 
         -- インデックス定義
-        FOR rec_idx IN c_indexes(rec.table_name) LOOP
+        FOR rec_idx IN c_indexes(table_name) LOOP
             object_ddl := DBMS_METADATA.GET_DDL('INDEX', rec_idx.index_name);
             -- 空文字を削除
             object_ddl := TRIM(object_ddl);
@@ -141,10 +155,12 @@ BEGIN
         END LOOP;
 
         -- コメント定義
-        FOR rec_cmmmt IN c_comment_ddl(rec.table_name) LOOP
+        FOR rec_cmmmt IN c_comment_ddl(table_name) LOOP
             DBMS_OUTPUT.PUT_LINE(rec_cmmmt.comment_ddl);
             DBMS_OUTPUT.PUT_LINE('/');          
         END LOOP;
+
+        i := arr_table_names.NEXT(i);
     END LOOP;
 END;
 /
