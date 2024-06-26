@@ -124,6 +124,9 @@ BEGIN
         object_ddl := REGEXP_REPLACE(object_ddl, '[[:cntrl:]]', '');
         object_ddl := REGEXP_REPLACE(object_ddl, '"', '');
 
+        -- 開始番号を1にセット
+        object_ddl := REGEXP_REPLACE(object_ddl, 'START WITH \d+', 'START WITH 1');
+
         DBMS_OUTPUT.PUT_LINE(object_ddl);
         DBMS_OUTPUT.PUT_LINE('/');
     END LOOP;
