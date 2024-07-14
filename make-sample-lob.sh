@@ -39,7 +39,7 @@ if [[ $? != 0 ]]; then
   exit 1
 fi
 
-cd ./sample_lob_data
+cd ./oracle/sample_lob_data
 
 sqlplus -s PDBUSER/"$ORACLE_PWD"@//localhost:"$ORACLE_LISTENER_PORT"/"$ORACLE_PDB" @create_table.sql
 if [[ $? != 0 ]]; then

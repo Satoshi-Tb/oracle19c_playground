@@ -5,8 +5,8 @@ services:
     container_name: ${ORACLE_CONTAINER_NAME:-oracle19}
     volumes:
       - ora-data19:/opt/oracle/oradata
-      - ./script/setup:/opt/oracle/scripts/setup # コンテナ作成時に一度だけ実施するスクリプト
-      - ./script/startup:/opt/oracle/scripts/startup # コンテナ起動のたびに実施するスクリプト
+      - ./oracle/script/setup:/opt/oracle/scripts/setup # コンテナ作成時に一度だけ実施するスクリプト
+      - ./oracle/script/startup:/opt/oracle/scripts/startup # コンテナ起動のたびに実施するスクリプト
 
     ports:
       - ${ORACLE_LISTENER_PORT:-1521}:1521
