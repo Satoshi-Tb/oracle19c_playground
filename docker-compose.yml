@@ -32,7 +32,9 @@ services:
       - prometheus
 
   oracledb_exporter:
-    image: ghcr.io/iamseth/oracledb_exporter
+    build:
+      context: ./oracle_exporter
+      dockerfile: Dockerfile
     container_name: oracledb_exporter
     ports:
       - 9161:9161
