@@ -16,4 +16,4 @@ else
   . "$SCRIPT_DIR"/dotenv.sample
 fi
 
-sqlplus PDBUSER/"$ORACLE_PWD"@//localhost:"$ORACLE_LISTENER_PORT"/"$ORACLE_PDB"
+sqlplus "${ORACLE_USER}"/"$ORACLE_PWD"@//localhost:"$ORACLE_LISTENER_PORT"/"$ORACLE_PDB"
