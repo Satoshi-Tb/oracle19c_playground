@@ -1,5 +1,48 @@
 version: "3.9"
 services:
+  prometheus:
+    image: prom/prometheus
+    container_name: prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yaml"
+    ports:
+      - 9090:9090
+    restart: unless-stopped
+    volumes:
+      - ./prometheus:/etc/prometheus
+      - prom_data:/prometheus
+    depends_on:
+      - oracledb_exporter
+
+  grafana:
+    image: grafana/grafana
+    container_name: grafana
+    ports:
+      - 3000:3000
+    restart: unless-stopped
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_USER}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PWD}
+    volumes:
+      - ./grafana/datasources:/etc/grafana/provisioning/datasources
+      - ./grafana/datasources/datasource.yaml:/etc/grafana/provisioning/datasources/datasource.yaml
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
+      - ./grafana/dashboards/dashboard.yaml:/etc/grafana/provisioning/dashboards/main.yaml
+    depends_on:
+      - prometheus
+
+  oracledb_exporter:
+    image: ghcr.io/iamseth/oracledb_exporter
+    container_name: oracledb_exporter
+    ports:
+      - 9161:9161
+    environment:
+      - DATA_SOURCE_NAME=oracle://${ORACLE_USER}:${ORACLE_PWD}@database:${ORACLE_LISTENER_PORT}/${ORACLE_PDB}
+    volumes:
+      - ./oracle_exporter/data:/exporter
+    depends_on:
+      - database
+
   database:
     image: container-registry.oracle.com/database/enterprise:19.3.0.0
     container_name: ${ORACLE_CONTAINER_NAME:-oracle19}
@@ -24,3 +67,4 @@ services:
 
 volumes:
   ora-data19:
+  prom_data:
