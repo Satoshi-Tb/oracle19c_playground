@@ -28,6 +28,7 @@ services:
       - ./grafana/datasources/datasource.yaml:/etc/grafana/provisioning/datasources/datasource.yaml
       - ./grafana/dashboards:/var/lib/grafana/dashboards
       - ./grafana/dashboards/dashboard.yaml:/etc/grafana/provisioning/dashboards/main.yaml
+      - ./grafana/data:/var/lib/grafana
     depends_on:
       - prometheus
 
