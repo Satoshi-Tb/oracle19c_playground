@@ -1,0 +1,21 @@
+DROP TYPE T_SAMPLE_LIST_ARRAY
+/
+
+-- オブジェクトタイプを作成
+CREATE OR REPLACE TYPE T_SAMPLE_LIST_OBJ AS OBJECT (
+  id NUMBER,
+  item1 VARCHAR2(100),
+  item2 VARCHAR2(100),
+  item3 VARCHAR2(4000),
+  created_at DATE,
+  created_by VARCHAR2(100),
+  updated_at DATE,
+  updated_by VARCHAR2(100)
+)
+/
+
+-- テーブルタイプを作成
+CREATE TYPE T_SAMPLE_LIST_ARRAY IS TABLE OF T_SAMPLE_LIST_OBJ
+/
+
+exit;

@@ -308,3 +308,5 @@ BEGIN
 
 END;
 /
+
+exit;
